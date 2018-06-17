@@ -160,12 +160,12 @@ public class Clock implements NBT.Compound {
 		Block b = world.getBlockAt(cx, cy, cz);
 		b.setTypeIdAndData(mCenter.getId(), dCenter, true);
 		b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
-		if(deepClock) {
+		if (deepClock) {
 			b = b.getRelative(clockFace);
 			b.setTypeIdAndData(mCenter.getId(), dCenter, true);
 			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		}
-		
+
 		// remove anything not created or updated this round
 		clearOldBlocks(time);
 	}
@@ -174,17 +174,17 @@ public class Clock implements NBT.Compound {
 		double ax = FastMath.sin(angle);
 		double ay = FastMath.cos(angle);
 		int lastx = Integer.MIN_VALUE, lasty = Integer.MIN_VALUE;
-		for(int i = 1; i <= length; ++i) {
+		for (int i = 1; i <= length; ++i) {
 			int x = (int) Math.round(i * ax);
 			int y = (int) Math.round(i * ay);
-			if(x != lastx || y != lasty) {
+			if (x != lastx || y != lasty) {
 				setBlock(x, y, front, time);
 				lastx = x;
 				lasty = y;
 			}
 		}
 	}
-	
+
 	void setBlock(int xn, int yn, boolean front, int time) {
 		Block b = null;
 		switch (clockFace) {
@@ -202,33 +202,33 @@ public class Clock implements NBT.Compound {
 				break;
 			case UP:
 				switch (clockFace_FlatBase) {
-					case NORTH: 
-						b = world.getBlockAt(cx + xn, cy , cz - yn);
+					case NORTH:
+						b = world.getBlockAt(cx + xn, cy, cz - yn);
 						break;
 					case SOUTH:
-						b = world.getBlockAt(cx - xn, cy , cz + yn);
+						b = world.getBlockAt(cx - xn, cy, cz + yn);
 						break;
 					case WEST:
-						b = world.getBlockAt(cx - yn, cy , cz - xn);
+						b = world.getBlockAt(cx - yn, cy, cz - xn);
 						break;
 					case EAST:
-						b = world.getBlockAt(cx + yn, cy , cz + xn);
+						b = world.getBlockAt(cx + yn, cy, cz + xn);
 						break;
 				}
 				break;
 			case DOWN:
 				switch (clockFace_FlatBase) {
-					case NORTH: 
-						b = world.getBlockAt(cx + xn, cy , cz + yn);
+					case NORTH:
+						b = world.getBlockAt(cx + xn, cy, cz + yn);
 						break;
 					case SOUTH:
-						b = world.getBlockAt(cx - xn, cy , cz - yn);
+						b = world.getBlockAt(cx - xn, cy, cz - yn);
 						break;
 					case WEST:
-						b = world.getBlockAt(cx + yn, cy , cz - xn);
+						b = world.getBlockAt(cx + yn, cy, cz - xn);
 						break;
 					case EAST:
-						b = world.getBlockAt(cx - yn, cy , cz + xn);
+						b = world.getBlockAt(cx - yn, cy, cz + xn);
 						break;
 				}
 				break;
@@ -254,9 +254,17 @@ public class Clock implements NBT.Compound {
 			for (int z = bNWD.getBlockZ() + dz; z <= bSEU.getBlockZ() - dz; ++z) {
 				for (int y = bNWD.getBlockY() + dy; y <= bSEU.getBlockY() - dy; ++y) {
 					Block b = world.getBlockAt(x, y, z);
-					if(b.getType() != Material.AIR) {
+					if (b.getType() != Material.AIR) {
 						List<MetadataValue> mv = b.getMetadata("AnalogClock");
-						if (mv.size() == 1 && mv.get(0).asInt() != time) {
+						if (mv.size() > 1) {
+							// just in case some other plugin is trying to claim this namespace
+							for (MetadataValue v : mv) {
+								if (v.getOwningPlugin() == AnalogClocks.plugin && v.asInt() != time) {
+									b.setType(Material.AIR);
+									break;
+								}
+							}
+						} else if (mv.size() == 1 && mv.get(0).asInt() != time) {
 							b.setType(Material.AIR);
 						}
 					}
@@ -265,6 +273,33 @@ public class Clock implements NBT.Compound {
 		}
 	}
 	
+	void removeClock() {
+		int dx = clockFace == BlockFace.WEST || clockFace == BlockFace.EAST ? 0 : 1;
+		int dz = clockFace == BlockFace.NORTH || clockFace == BlockFace.SOUTH ? 0 : 1;
+		int dy = clockFace == BlockFace.UP || clockFace == BlockFace.DOWN ? 0 : 1;
+		for (int x = bNWD.getBlockX() + dx; x <= bSEU.getBlockX() - dx; ++x) {
+			for (int z = bNWD.getBlockZ() + dz; z <= bSEU.getBlockZ() - dz; ++z) {
+				for (int y = bNWD.getBlockY() + dy; y <= bSEU.getBlockY() - dy; ++y) {
+					Block b = world.getBlockAt(x, y, z);
+					List<MetadataValue> mv = b.getMetadata("AnalogClock");
+					if (mv.size() > 1) {
+						// just in case some other plugin is trying to claim this namespace
+						for (MetadataValue v : mv) {
+							if (v.getOwningPlugin() == AnalogClocks.plugin) {
+								b.removeMetadata("AnalogClock", AnalogClocks.plugin);
+								b.setType(Material.AIR);
+								break;
+							}
+						}
+					} else if (mv.size() == 1) {
+						b.removeMetadata("AnalogClock", AnalogClocks.plugin);
+						b.setType(Material.AIR);
+					}
+				}
+			}
+		}
+	}
+
 	@Override
 	public String[] nbtKeys() {
 		return new String[]{"n", "d", "w", "m", "seu", "nwd",
