@@ -350,7 +350,7 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 
 			if (ok) {
 				// let's set up this clock, then!
-				// /analogclock create <name> [minute-block] [hour-block] [center-block] [hours-only]
+				// /analogclock create <name> [hour-block] [minute-block] [center-block] [hours-only]
 				Material mMin, mHour, mCenter;
 				byte dMin = 0, dHour = 0, dCenter = 0;
 				boolean minuteClock = true;
@@ -365,14 +365,14 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 							p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[2]);
 							return;
 						}
-						mMin = Material.WOOL;
-						dMin = (byte) col.getID();
+						mHour = Material.WOOL;
+						dHour = (byte) col.getID();
 					} else {
-						mMin = Material.getMaterial(t.getID());
+						mHour = Material.getMaterial(t.getID());
 					}
 				} else {
-					mMin = DEFAULT_HAND_MATERIAL;
-					dMin = DEFAULT_HAND_MATERIAL_D;
+					mHour = DEFAULT_HAND_MATERIAL;
+					dHour = DEFAULT_HAND_MATERIAL_D;
 				}
 
 				if (args.length >= 4) {
@@ -384,14 +384,14 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 							p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[3]);
 							return;
 						}
-						mHour = Material.WOOL;
-						dHour = (byte) col.getID();
+						mMin = Material.WOOL;
+						dMin = (byte) col.getID();
 					} else {
-						mHour = Material.getMaterial(t.getID());
+						mMin = Material.getMaterial(t.getID());
 					}
 				} else {
-					mHour = mMin;
-					dHour = dMin;
+					mMin = mHour;
+					dMin = dHour;
 				}
 
 				if (args.length >= 5) {

@@ -10,7 +10,7 @@ commands:
     description: AnalogClock
     aliases: ac
     usage: |
-      /analogclock create <name> [minute-block] [hour-block] [center-block] [hours-only]
+      /analogclock create <name> [hour-block] [minute-block] [center-block] [hours-only]
       /analogclock delete <name>
       /analogclock list
     permission: analogclock.admin
