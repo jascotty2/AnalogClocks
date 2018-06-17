@@ -159,11 +159,11 @@ public class Clock implements NBT.Compound {
 		// (may update in the future for larger clocks)
 		Block b = world.getBlockAt(cx, cy, cz);
 		b.setTypeIdAndData(mCenter.getId(), dCenter, true);
-		b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClock.plugin, time));
+		b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		if(deepClock) {
 			b = b.getRelative(clockFace);
 			b.setTypeIdAndData(mCenter.getId(), dCenter, true);
-			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClock.plugin, time));
+			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		}
 		
 		// remove anything not created or updated this round
@@ -242,7 +242,7 @@ public class Clock implements NBT.Compound {
 			} else {
 				b.setTypeIdAndData(mHour.getId(), dHour, true);
 			}
-			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClock.plugin, time));
+			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		}
 	}
 

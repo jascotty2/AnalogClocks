@@ -40,10 +40,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class AnalogClock extends JavaPlugin implements Runnable {
+public class AnalogClocks extends JavaPlugin implements Runnable {
 
 	File dataFile;
-	String prefix = ChatColor.GOLD.toString() + "[" + ChatColor.DARK_AQUA + "AnalogClock" + ChatColor.GOLD + "] ";
+	String prefix = ChatColor.GOLD.toString() + "[" + ChatColor.DARK_AQUA + "AnalogClocks" + ChatColor.GOLD + "] ";
 	HashMap<String, Clock> clocks = new HashMap<String, Clock>();
 	boolean dirty = false;
 	int taskID = -1;
@@ -52,7 +52,7 @@ public class AnalogClock extends JavaPlugin implements Runnable {
 	final static int MAX_CLOCK_SIZE = 150;
 	final static Material DEFAULT_HAND_MATERIAL = Material.WOOL;
 	final static byte DEFAULT_HAND_MATERIAL_D = 15;
-	protected static AnalogClock plugin = null;
+	protected static AnalogClocks plugin = null;
 
 	@Override
 	public void onLoad() {
