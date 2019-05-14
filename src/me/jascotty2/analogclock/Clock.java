@@ -48,7 +48,6 @@ public class Clock implements NBT.Compound {
 	String worldName;
 	World world;
 	Material mMin, mHour, mCenter;
-	byte dMin = 0, dHour = 0, dCenter = 0;
 	// values stored locally (not saved)
 	int cx = Integer.MAX_VALUE, cy = Integer.MAX_VALUE, cz = Integer.MAX_VALUE, cr = 3;
 	boolean deepClock = false;
@@ -59,7 +58,7 @@ public class Clock implements NBT.Compound {
 	}
 
 	public Clock(String name, Server s, World w, boolean minutes, Location locNWD, Location locSEU, BlockFace clockFace,
-			Material mMin, byte dMin, Material mHour, byte dHour, Material mCenter, byte dCenter) {
+			Material mMin, Material mHour, Material mCenter) {
 		this.name = name;
 		updateMinutes = minutes;
 		if (locSEU != null) {
@@ -73,11 +72,8 @@ public class Clock implements NBT.Compound {
 		}
 		this.clockFace = clockFace;
 		this.mMin = mMin;
-		this.dMin = dMin;
 		this.mHour = mHour;
-		this.dHour = dHour;
 		this.mCenter = mCenter;
-		this.dCenter = dCenter;
 	}
 
 	void update() {
@@ -145,6 +141,8 @@ public class Clock implements NBT.Compound {
 			// should never happen, but just in case..
 			return;
 		}
+		// remove anything not created or updated this round
+		clearOldBlocks(time);
 
 		// draw hour hand first
 		int hourTime = ((int) Math.round(time / 1000)) * 1000;
@@ -158,23 +156,22 @@ public class Clock implements NBT.Compound {
 		// center piece is always one pixel
 		// (may update in the future for larger clocks)
 		Block b = world.getBlockAt(cx, cy, cz);
-		b.setTypeIdAndData(mCenter.getId(), dCenter, true);
+		b.setType(mCenter);
 		b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		if (deepClock) {
 			b = b.getRelative(clockFace);
-			b.setTypeIdAndData(mCenter.getId(), dCenter, true);
+			b.setType(mCenter);
 			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		}
 
-		// remove anything not created or updated this round
-		clearOldBlocks(time);
 	}
 
-	void drawHand(double angle, int length, boolean front, int time) {
+	void drawHand(double angle, double length, boolean front, int time) {
 		double ax = FastMath.sin(angle);
 		double ay = FastMath.cos(angle);
+		double len = length + .6;//Math.sqrt(length * 2);
 		int lastx = Integer.MIN_VALUE, lasty = Integer.MIN_VALUE;
-		for (int i = 1; i <= length; ++i) {
+		for (double i = .5; i <= len; ++i) {
 			int x = (int) Math.round(i * ax);
 			int y = (int) Math.round(i * ay);
 			if (x != lastx || y != lasty) {
@@ -233,14 +230,14 @@ public class Clock implements NBT.Compound {
 				}
 				break;
 		}
-		if (b != null) {
+		if (b != null && b.getType() == Material.AIR) {
 			if (front) {
 				if (deepClock) {
 					b = b.getRelative(clockFace);
 				}
-				b.setTypeIdAndData(mMin.getId(), dMin, true);
+				b.setType(mMin);
 			} else {
-				b.setTypeIdAndData(mHour.getId(), dHour, true);
+				b.setType(mHour);
 			}
 			b.setMetadata("AnalogClock", new FixedMetadataValue(AnalogClocks.plugin, time));
 		}
@@ -261,11 +258,13 @@ public class Clock implements NBT.Compound {
 							for (MetadataValue v : mv) {
 								if (v.getOwningPlugin() == AnalogClocks.plugin && v.asInt() != time) {
 									b.setType(Material.AIR);
+									b.removeMetadata("AnalogClock", AnalogClocks.plugin);
 									break;
 								}
 							}
 						} else if (mv.size() == 1 && mv.get(0).asInt() != time) {
 							b.setType(Material.AIR);
+							b.removeMetadata("AnalogClock", AnalogClocks.plugin);
 						}
 					}
 				}
@@ -303,7 +302,7 @@ public class Clock implements NBT.Compound {
 	@Override
 	public String[] nbtKeys() {
 		return new String[]{"n", "d", "w", "m", "seu", "nwd",
-			"cf", "cb", "mM", "dM", "mH", "dH", "mC", "dC"};
+			"cf", "cb", "mM", "mH", "mC"};
 	}
 
 	@Override
@@ -325,18 +324,12 @@ public class Clock implements NBT.Compound {
 				return clockFace == null ? (byte) 0 : clockFace.name();
 			case 7: // cb
 				return clockFace_FlatBase == null ? (byte) 0 : clockFace_FlatBase.name();
-			case 8: // "mM", "dM", "mH", "dH", "mC", "dC"
-				return mMin == null ? 0 : mMin.getId();
+			case 8: // "mM", "mH", "mC"
+				return mMin == null ? (String) null : mMin.name();
 			case 9:
-				return dMin;
+				return mHour == null ? (String) null : mHour.name();
 			case 10:
-				return mHour == null ? 0 : mHour.getId();
-			case 11:
-				return dHour;
-			case 12:
-				return mCenter == null ? 0 : mCenter.getId();
-			case 13:
-				return dCenter;
+				return mCenter == null ? (String) null : mCenter.name();
 
 		}
 		return null;
@@ -363,25 +356,15 @@ public class Clock implements NBT.Compound {
 		if ((f = nbt.getString("cb")) != null) {
 			c.clockFace_FlatBase = BlockFace.valueOf(f);
 		}// "mM", "dM", "mH", "dH", "mC", "dC"
-		int m = nbt.getInteger("mM", 0);
-		byte d = nbt.getByte("dM");
-		if (m > 0) {
+		String m = nbt.getString("mM");
+		if (m != null) {
 			c.mMin = Material.getMaterial(m);
 		}
-		if (d >= 0) {
-			c.dMin = d;
-		}
-		if ((m = nbt.getInteger("mH", 0)) > 0) {
+		if ((m = nbt.getString("mH")) != null) {
 			c.mHour = Material.getMaterial(m);
 		}
-		if ((d = nbt.getByte("dH")) >= 0) {
-			c.dHour = d;
-		}
-		if ((m = nbt.getInteger("mC", 0)) > 0) {
+		if ((m = nbt.getString("mC")) != null) {
 			c.mCenter = Material.getMaterial(m);
-		}
-		if ((d = nbt.getByte("dC")) >= 0) {
-			c.dCenter = d;
 		}
 		return c;
 	}

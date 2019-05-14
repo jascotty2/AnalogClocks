@@ -19,9 +19,11 @@ package me.jascotty2.analogclock;
 
 // using a local copy of world edit's BlockVector, so the plugin still functions in case WE is removed from the server
 import com.sk89q.we.BlockVector;
-import com.sk89q.worldedit.blocks.BlockType;
-import com.sk89q.worldedit.blocks.ClothColor;
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.bukkit.WorldEditPlugin;
+import com.sk89q.worldedit.world.block.BlockType;
+import com.sk89q.worldedit.world.block.BlockTypes;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,8 +52,7 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 	public WorldEditPlugin worldEdit = null;
 	final static int MIN_CLOCK_SIZE = 5;
 	final static int MAX_CLOCK_SIZE = 150;
-	final static Material DEFAULT_HAND_MATERIAL = Material.WOOL;
-	final static byte DEFAULT_HAND_MATERIAL_D = 15;
+	final static Material DEFAULT_HAND_MATERIAL = Material.BLACK_WOOL;
 	protected static AnalogClocks plugin = null;
 
 	@Override
@@ -85,7 +86,7 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 			dataFile.getParentFile().mkdirs();
 		}
 		// each minecraft hour takes 1000 ticks (50 seconds). 
-		taskID = getServer().getScheduler().scheduleSyncRepeatingTask(this, this, 100, 20);
+		taskID = getServer().getScheduler().scheduleSyncRepeatingTask(this, this, 100, 60);
 	}
 
 	@Override
@@ -180,18 +181,22 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 		if (worldEdit == null) {
 			p.sendMessage(prefix + ChatColor.RED + "Missing WorldEdit!");
 		} else {
-			com.sk89q.worldedit.bukkit.selections.Selection sel = worldEdit.getSelection(p);
+			com.sk89q.worldedit.regions.Region sel = null;
+			try {
+				sel = worldEdit.getSession(p).getSelection(BukkitAdapter.adapt(p.getWorld()));
+			} catch (com.sk89q.worldedit.IncompleteRegionException ex) {
+			}
 
-			final com.sk89q.worldedit.BlockVector min;
-			final com.sk89q.worldedit.BlockVector max;
+			final com.sk89q.worldedit.math.BlockVector3 min;
+			final com.sk89q.worldedit.math.BlockVector3 max;
 
 			if (sel == null) {
 				p.sendMessage(prefix + ChatColor.RED + "Select a region for region remove, or specify the name of the clock to remove");
 				return;
-			} else if (sel instanceof com.sk89q.worldedit.bukkit.selections.CuboidSelection) {
+			} else if (sel instanceof com.sk89q.worldedit.regions.CuboidRegion) {
 
-				min = sel.getNativeMinimumPoint().toBlockVector();
-				max = sel.getNativeMaximumPoint().toBlockVector();
+				min = sel.getMinimumPoint();
+				max = sel.getMaximumPoint();
 
 			} else {
 				p.sendMessage(prefix + ChatColor.RED + "The type of region selected in WorldEdit is unsupported!");
@@ -243,8 +248,13 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 				return;
 			}
 
-			com.sk89q.worldedit.bukkit.selections.Selection sel = worldEdit.getSelection(p);
+			com.sk89q.worldedit.regions.Region sel = null;
+			try {
+				sel = worldEdit.getSession(p).getSelection(BukkitAdapter.adapt(p.getWorld()));
+			} catch (com.sk89q.worldedit.IncompleteRegionException ex) {
+			}
 
+			final Location playerLocation = p.getLocation();
 			Location min = null;
 			Location max = null;
 			boolean ok = false;
@@ -252,12 +262,12 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 
 			if (sel == null) {
 				p.sendMessage(prefix + ChatColor.RED + "Select a region to define first");
-			} else if (!sel.getMinimumPoint().getWorld().getUID().equals(p.getLocation().getWorld().getUID())) {
+			} else if (!sel.getWorld().getName().equals(playerLocation.getWorld().getName())) {
 				p.sendMessage(prefix + ChatColor.RED + "Cannot define a clock in a different world!");
-			} else if (sel instanceof com.sk89q.worldedit.bukkit.selections.CuboidSelection) {
+			} else if (sel instanceof com.sk89q.worldedit.regions.CuboidRegion) {
 
-				min = sel.getMinimumPoint();
-				max = sel.getMaximumPoint();
+				min = BukkitAdapter.adapt(playerLocation.getWorld(), sel.getMinimumPoint());
+				max = BukkitAdapter.adapt(playerLocation.getWorld(), sel.getMaximumPoint());
 
 				// sanity check
 				if (max.getBlockY() - min.getBlockY() <= 2) {
@@ -352,72 +362,50 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 				// let's set up this clock, then!
 				// /analogclock create <name> [hour-block] [minute-block] [center-block] [hours-only]
 				Material mMin, mHour, mCenter;
-				byte dMin = 0, dHour = 0, dCenter = 0;
 				boolean minuteClock = true;
 
 				if (args.length >= 3) {
 					// todo? :data
-					BlockType t = BlockType.lookup(args[2]);
+					BlockType t = BlockTypes.get(args[2]);
 					if (t == null) {
-						// is it a wool color?
-						ClothColor col = ClothColor.lookup(args[2]);
-						if (col == null) {
-							p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[2]);
-							return;
-						}
-						mHour = Material.WOOL;
-						dHour = (byte) col.getID();
+						p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[2]);
+						return;
 					} else {
-						mHour = Material.getMaterial(t.getID());
+						mHour = BukkitAdapter.adapt(t);
 					}
 				} else {
 					mHour = DEFAULT_HAND_MATERIAL;
-					dHour = DEFAULT_HAND_MATERIAL_D;
 				}
 
 				if (args.length >= 4) {
-					BlockType t = BlockType.lookup(args[3]);
+					BlockType t = BlockTypes.get(args[3]);
 					if (t == null) {
-						// is it a wool color?
-						ClothColor col = ClothColor.lookup(args[3]);
-						if (col == null) {
-							p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[3]);
-							return;
-						}
-						mMin = Material.WOOL;
-						dMin = (byte) col.getID();
+						p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[3]);
+						return;
 					} else {
-						mMin = Material.getMaterial(t.getID());
+						mMin = BukkitAdapter.adapt(t);
 					}
 				} else {
 					mMin = mHour;
-					dMin = dHour;
 				}
 
 				if (args.length >= 5) {
-					BlockType t = BlockType.lookup(args[4]);
+					BlockType t = BlockTypes.get(args[4]);
 					if (t == null) {
-						// is it a wool color?
-						ClothColor col = ClothColor.lookup(args[4]);
-						if (col == null) {
-							p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[4]);
-							return;
-						}
-						mCenter = Material.WOOL;
-						dCenter = (byte) col.getID();
+						p.sendMessage(prefix + ChatColor.RED + "Unknown material type: " + args[4]);
+						return;
 					} else {
-						mCenter = Material.getMaterial(t.getID());
+						mCenter = BukkitAdapter.adapt(t);
 					}
 				} else {
 					mCenter = mHour;
-					dCenter = dHour;
 				}
 
 				if (args.length >= 6) {
 					minuteClock = !(args[5].equalsIgnoreCase("true") || args[5].equalsIgnoreCase("t") || args[5].equals("1"));
 				}
 
-				Clock c = new Clock(args[1], getServer(), p.getWorld(), minuteClock, min, max, clockFace, mMin, dMin, mHour, dHour, mCenter, dCenter);
+				Clock c = new Clock(args[1], getServer(), p.getWorld(), minuteClock, min, max, clockFace, mMin, mHour, mCenter);
 				c.clockFace_FlatBase = clockFace2;
 
 				clocks.put(clockName, c);

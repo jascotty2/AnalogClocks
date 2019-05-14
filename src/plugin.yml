@@ -1,6 +1,7 @@
 name: AnalogClocks
 main: me.jascotty2.analogclock.AnalogClocks
-version: 1.0
+version: 1.1
+api-version: 1.13
 website: http://github.com/jascotty2
 author: jascotty2
 description: Physical clock face for minecraft
@@ -8,7 +9,6 @@ softdepend: [WorldEdit]
 commands:
   analogclock:
     description: AnalogClock
-    aliases: ac
     usage: |
       /analogclock create <name> [hour-block] [minute-block] [center-block] [hours-only]
       /analogclock delete <name>
