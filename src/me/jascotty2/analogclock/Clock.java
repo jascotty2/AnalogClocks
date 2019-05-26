@@ -271,6 +271,23 @@ public class Clock implements NBT.Compound {
 			}
 		}
 	}
+	void clear() {
+		int dx = clockFace == BlockFace.WEST || clockFace == BlockFace.EAST ? 0 : 1;
+		int dz = clockFace == BlockFace.NORTH || clockFace == BlockFace.SOUTH ? 0 : 1;
+		int dy = clockFace == BlockFace.UP || clockFace == BlockFace.DOWN ? 0 : 1;
+		for (int x = bNWD.getBlockX() + dx; x <= bSEU.getBlockX() - dx; ++x) {
+			for (int z = bNWD.getBlockZ() + dz; z <= bSEU.getBlockZ() - dz; ++z) {
+				for (int y = bNWD.getBlockY() + dy; y <= bSEU.getBlockY() - dy; ++y) {
+					Block b = world.getBlockAt(x, y, z);
+					if (b.getType() != Material.AIR) {
+						if (!b.getMetadata("AnalogClock").isEmpty()) {
+							b.setType(Material.AIR);
+						}
+					}
+				}
+			}
+		}
+	}
 	
 	void removeClock() {
 		int dx = clockFace == BlockFace.WEST || clockFace == BlockFace.EAST ? 0 : 1;

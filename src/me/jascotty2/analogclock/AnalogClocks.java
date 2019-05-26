@@ -96,6 +96,11 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 			taskID = -1;
 		}
 		save();
+		for (Clock c : clocks.values()) {
+			if (c != null) {
+				c.clear();
+			}
+		}
 	}
 
 	@Override

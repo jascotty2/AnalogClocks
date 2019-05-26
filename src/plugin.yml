@@ -9,6 +9,7 @@ softdepend: [WorldEdit]
 commands:
   analogclock:
     description: AnalogClock
+    alias: analogclocks
     usage: |
       /analogclock create <name> [hour-block] [minute-block] [center-block] [hours-only]
       /analogclock delete <name>
