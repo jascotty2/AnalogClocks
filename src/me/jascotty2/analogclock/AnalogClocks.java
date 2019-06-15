@@ -46,7 +46,7 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 
 	File dataFile;
 	String prefix = ChatColor.GOLD.toString() + "[" + ChatColor.DARK_AQUA + "AnalogClocks" + ChatColor.GOLD + "] ";
-	HashMap<String, Clock> clocks = new HashMap<String, Clock>();
+	HashMap<String, Clock> clocks = new HashMap();
 	boolean dirty = false;
 	int taskID = -1;
 	public WorldEditPlugin worldEdit = null;
@@ -105,7 +105,6 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 
 	@Override
 	public void run() {
-		final Server s = getServer();
 		for (Clock c : clocks.values()) {
 			if (c != null) {
 				c.update();
@@ -173,7 +172,7 @@ public class AnalogClocks extends JavaPlugin implements Runnable {
 	void removeClock(CommandSender p, String clock) {
 		Clock c = clocks.remove(clock.toLowerCase());
 		if (c != null) {
-			c.removeClock();
+			c.clear();
 			p.sendMessage(prefix + ChatColor.GREEN + "Clock removed!");
 			dirty = true;
 			save();
