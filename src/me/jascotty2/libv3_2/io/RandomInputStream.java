@@ -1,4 +1,4 @@
-package me.jascotty2.libv3.io;
+package me.jascotty2.libv3_2.io;
 
 import java.io.IOException;
 import java.io.InputStream;

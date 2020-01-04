@@ -18,8 +18,10 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
-package me.jascotty2.libv3.io;
+package me.jascotty2.libv3_2.io;
 
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.EOFException;
@@ -27,15 +29,17 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
-import me.jascotty2.libv3.util.NBTList;
-import me.jascotty2.libv3.util.NBTMap;
+import java.util.zip.InflaterInputStream;
+import java.util.zip.ZipException;
 
 public class NBT {
 
@@ -46,51 +50,55 @@ public class NBT {
 		/**
 		 * This tag is used to mark the end of a list.
 		 */
-		END(null),
+		END(null), // 0
 		/**
 		 * A single signed byte (8 bits)
 		 */
-		BYTE(Byte.class),
+		BYTE(Byte.class), // 1
 		/**
 		 * A signed short (16 bits, big endian)
 		 */
-		SHORT(Short.class),
+		SHORT(Short.class), // 2
 		/**
 		 * A signed short (32 bits, big endian)
 		 */
-		INT(Integer.class),
+		INT(Integer.class), // 3
 		/**
 		 * A signed long (64 bits, big endian)
 		 */
-		LONG(Long.class),
+		LONG(Long.class), // 4
 		/**
 		 * A floating point value (32 bits, big endian, IEEE 754-2008, binary32)
 		 */
-		FLOAT(Float.class),
+		FLOAT(Float.class), // 5
 		/**
 		 * A floating point value (64 bits, big endian, IEEE 754-2008, binary64)
 		 */
-		DOUBLE(Double.class),
+		DOUBLE(Double.class), // 6
 		/**
 		 * An array of bytes of unspecified format
 		 */
-		BYTE_ARRAY(Byte[].class),
+		BYTE_ARRAY(Byte[].class), // 7
 		/**
 		 * An array of bytes defining a string in UTF-8 format.
 		 */
-		STRING(String.class),
+		STRING(String.class), // 8
 		/**
 		 * A sequential list of Identical Unnamed Tags
 		 */
-		LIST(List.class),
+		LIST(List.class), // 9
 		/**
 		 * A sequential list of Named Tags.
 		 */
-		COMPOUND(Map.class),
+		COMPOUND(Map.class), // 10
 		/**
 		 * An array of signed shorts (32 bits, big endian)
 		 */
-		INT_ARRAY(Integer[].class), //		// 
+		INT_ARRAY(Integer[].class), // 11
+		/**
+		 * An array of long integers (64 bits, big endian)
+		 */
+		LONG_ARRAY(Long[].class), // 12
 		//		// - everything past this point is non-official
 		//		//
 		//		// future use? eg, allow maps Integer -> Object
@@ -171,6 +179,8 @@ public class NBT {
 					return Tag.BYTE_ARRAY;
 				} else if (Integer[].class == type || int[].class == type) {
 					return Tag.INT_ARRAY;
+				} else if (Long[].class == type || long[].class == type) {
+					return Tag.LONG_ARRAY;
 				} // Custom values
 				else if (Compound.class.isAssignableFrom(type)) {
 					return Tag.CUSTOM_COMPOUND;
@@ -282,6 +292,13 @@ public class NBT {
 			int[] data = new int[size];
 			for (int i = 0; i < size; ++i) {
 				data[i] = in.readInt();
+			}
+			return data;
+		} else if (type == Tag.LONG_ARRAY.value) {
+			final int size = in.readInt();
+			long[] data = new long[size];
+			for (int i = 0; i < size; ++i) {
+				data[i] = in.readLong();
 			}
 			return data;
 		} else // at this point, only list and map (recursive-capable types) are left
@@ -436,6 +453,12 @@ public class NBT {
 			for (int i = 0; i < arr.length; ++i) {
 				out.writeInt(arr[i]);
 			}
+		} else if (type == Tag.LONG_ARRAY) {
+			long[] arr = (long[]) obj;
+			out.writeInt(arr.length);
+			for (int i = 0; i < arr.length; ++i) {
+				out.writeLong(arr[i]);
+			}
 		} else // at this point, only list and map (recursive-capable types) are left
 		if (depth > MAX_DEPTH) {
 			throw new RuntimeException("Tried to write NBT tag with too high complexity, depth > " + MAX_DEPTH);
@@ -503,7 +526,50 @@ public class NBT {
 
 	public static String debugFile(File toLoad) throws IOException {
 		// could theoretically load as a list, but in practice, the root should be a map
-		DataInputStream in = new DataInputStream(new GZIPInputStream(new FileInputStream(toLoad)));
+		DataInputStream in;
+		try {
+			in = new DataInputStream(new GZIPInputStream(new FileInputStream(toLoad)));
+		} catch (ZipException e) {
+			if (toLoad.getName().endsWith("mca") && e.getMessage().equals("Not in GZIP format")) {
+				// 0-4095 = locations (1024 4-bytes: offset x 3, sector count)
+				// 4096-8191 = timestamps (1024 4-byte big-endian integers)
+				// The location in the region file of a chunk at (x, z) can be found at byte offset 4 * ((x mod 32) + (z mod 32) * 32) 
+				// In case the values of x mod 32 or z mod 32 are negative, simply add 32, or use  4 * ((x & 31) + (z & 31) * 32)
+				//chunk data starts at byte 5
+				RandomAccessFile fin = new RandomAccessFile(toLoad, "r");
+				// let's grab the chunk at 2,2
+				int x = 2, z = 2;
+				int locIndex = ((x & 31) + (z & 31) * 32);
+				fin.seek(locIndex * 4);
+				int i = fin.readInt();
+				int fileOffset = i >> 8;
+				int len = i & 255;
+				fin.seek(4096 + locIndex * 4);
+				int time = fin.readInt();
+				String info = toLoad.getName() + " chunk at " + x + "," + z + ": " + fileOffset + " (" + len + ") time=" + time + "\n";
+				// jump to location
+				if(len == 255) {
+					fin.seek(fileOffset * 4096);
+					len = (fin.readInt() + 4) / 4096 + 1;
+				}
+				fin.seek(fileOffset * 4096);
+				// first integer is full size and must be > 0 && <= 4096 * len
+				int chunkLen = fin.readInt();
+				// compression type:
+				byte type = fin.readByte();
+				byte[] data = new byte[chunkLen - 1];
+				fin.read(data);
+				if(type == 1) {
+					in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(new ByteArrayInputStream(data))));
+				} else if(type == 2) {
+					in = new DataInputStream(new BufferedInputStream(new InflaterInputStream(new ByteArrayInputStream(data))));
+				} else {
+					throw new IOException("Region with invalid compression tag: " + type);
+				}
+				System.out.println(info);
+			} else throw e;
+		}
+		
 //		{
 //			DataOutputStream out = new DataOutputStream(new FileOutputStream(new File(toLoad.getAbsolutePath() + "2")));
 //			byte wrDat[] = new byte[2048];
@@ -572,6 +638,16 @@ public class NBT {
 			str.append("[").append(size).append("]{");
 			for (int i = 0; i < size; ++i) {
 				str.append(in.readInt());
+				if (i + 1 < size) {
+					str.append(", ");
+				}
+			}
+			str.append("}");
+		} else if (type == Tag.LONG_ARRAY.value) {
+			final int size = in.readInt();
+			str.append("[").append(size).append("]{");
+			for (int i = 0; i < size; ++i) {
+				str.append(in.readLong());
 				if (i + 1 < size) {
 					str.append(", ");
 				}
@@ -677,6 +753,17 @@ public class NBT {
 				}
 				str.append("}");
 				break;
+			case LONG_ARRAY:
+				long[] arr3 = (long[]) obj;
+				str.append("[").append(arr3.length).append("]{");
+				for (int i = 0; i < arr3.length; ++i) {
+					str.append(arr3[i]);
+					if (i + 1 < arr3.length) {
+						str.append(", ");
+					}
+				}
+				str.append("}");
+				break;
 			case LIST:
 				List l = (List) obj;
 				Tag t = (obj instanceof NBTList ? Tag.getType(((NBTList) obj).getType())
@@ -726,7 +813,7 @@ public class NBT {
 	}
 
 	public static void main(String[] args) throws IOException {
-		System.out.println(debugFile(new File("data.dat")));
+		System.out.println(NBT.debugContents(NBT.load(new File("c9174ba9-6a40-4d8f-a317-cb6a018e64ff.dat"))));
 	}
 
 	public static void main2(String[] args) throws IOException {

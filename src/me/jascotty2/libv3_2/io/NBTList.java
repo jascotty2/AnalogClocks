@@ -1,8 +1,8 @@
-package me.jascotty2.libv3.util;
+package me.jascotty2.libv3_2.io;
 
 import java.util.Collection;
 import java.util.LinkedList;
-import me.jascotty2.libv3.io.NBT.Tag;
+import me.jascotty2.libv3_2.io.NBT.Tag;
 
 public class NBTList extends LinkedList<Object> {
 
